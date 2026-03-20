@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   Send,
   Phone,
@@ -15,8 +15,15 @@ import {
 
 const CONSULTANT_NAME = "Связь.Подбор";
 const TELEGRAM_URL = "https://t.me/oh_my_vigor";
-const WHATSAPP_URL = "https://wa.me/79877310529";
+const WHATSAPP_URL = "https://wa.me/89177072098";
 const PHONE = "+7 987 731 05 29";
+const PHONE_LINK = "89877310529";
+const FORM_NAME = "lead";
+const QR_LINK = "https://ar-app-pi.vercel.app/";
+const QR_SRC = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(
+  QR_LINK
+)}`;
+const API_ENDPOINT = "/api/lead"; // Vercel serverless endpoint
 
 const steps = [
   {
@@ -53,13 +60,43 @@ const cases = [
 const operators = ["МТС", "Ростелеком", "Дом.ру"];
 
 export default function App() {
-  const phoneLink = PHONE.replace(/\D/g, "");
+  const [status, setStatus] = useState("idle"); // idle | sending | ok | error
+  const phoneLink = PHONE_LINK;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const data = new FormData(e.currentTarget);
-    console.log(Object.fromEntries(data.entries()));
-    alert("Заявка отправлена (демо). Сейчас она сохраняется локально в консоль.");
+    setStatus("sending");
+    const form = e.currentTarget;
+    const data = new FormData(form);
+    data.append("form-name", FORM_NAME);
+
+    try {
+      await fetch(API_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: data.get("name"),
+          phone: data.get("phone"),
+          interest: data.get("interest"),
+          comment: data.get("comment"),
+        }),
+      });
+      setStatus("ok");
+      form.reset();
+      // запасной вариант сохранения на клиенте
+      const saved = JSON.parse(localStorage.getItem("lead-submissions") || "[]");
+      saved.push({
+        name: data.get("name"),
+        phone: data.get("phone"),
+        interest: data.get("interest"),
+        comment: data.get("comment"),
+        ts: new Date().toISOString(),
+      });
+      localStorage.setItem("lead-submissions", JSON.stringify(saved));
+    } catch (err) {
+      console.error(err);
+      setStatus("error");
+    }
   };
 
   return (
@@ -245,10 +282,16 @@ export default function App() {
               <Phone size={18} /> Позвонить
             </a>
             <div className="flex flex-col items-center justify-center rounded-2xl bg-white p-4 text-center shadow-lg shadow-slate-200">
-              <div className="flex h-28 w-28 items-center justify-center rounded-2xl bg-slate-100 text-slate-500">
-                <QrCode size={36} />
-              </div>
-              <p className="mt-2 text-sm text-slate-600">Удобно сохранить контакт и вернуться позже</p>
+              <img
+                src={QR_SRC}
+                alt="QR для быстрого перехода"
+                className="h-28 w-28 rounded-2xl border border-slate-200 bg-slate-50 object-contain"
+                loading="lazy"
+              />
+              <p className="mt-2 text-sm text-slate-600">
+                Удобно сохранить контакт и вернуться позже
+              </p>
+              <p className="mt-1 text-[11px] text-slate-400 break-all">{QR_LINK}</p>
             </div>
           </div>
         </section>
@@ -257,9 +300,19 @@ export default function App() {
         <section className="mt-14" id="form">
           <h2 className="text-2xl font-bold mb-4">Оставить заявку</h2>
           <form
+            name={FORM_NAME}
+            method="POST"
+            data-netlify="true"
+            data-netlify-honeypot="bot-field"
             onSubmit={handleSubmit}
             className="space-y-4 rounded-3xl bg-white p-5 shadow-2xl shadow-slate-200/70"
           >
+            <input type="hidden" name="form-name" value={FORM_NAME} />
+            <p className="hidden">
+              <label>
+                Не заполняйте это поле: <input name="bot-field" />
+              </label>
+            </p>
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="space-y-2 text-sm font-semibold text-slate-900">
                 Имя
@@ -303,14 +356,23 @@ export default function App() {
             </label>
             <button
               type="submit"
-              className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#0d5df5] to-[#0b3c8a] px-4 py-3 text-base font-semibold text-white shadow-xl shadow-indigo-500/30 transition hover:-translate-y-0.5"
+              disabled={status === "sending"}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#0d5df5] to-[#0b3c8a] px-4 py-3 text-base font-semibold text-white shadow-xl shadow-indigo-500/30 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-80"
             >
-              Получить консультацию
+              {status === "sending" ? "Отправляем..." : "Получить консультацию"}
               <ArrowRight size={18} />
             </button>
-            <p className="text-sm text-slate-500">
+            <div className="text-sm text-slate-500" aria-live="polite">
               Я свяжусь с вами и коротко помогу понять, есть ли смысл что-то менять.
-            </p>
+              {status === "ok" && (
+                <span className="ml-2 text-[#0d5df5]">Заявка отправлена, я скоро свяжусь.</span>
+              )}
+              {status === "error" && (
+                <span className="ml-2 text-rose-500">
+                  Не удалось отправить. Попробуйте ещё раз или напишите в Telegram.
+                </span>
+              )}
+            </div>
           </form>
         </section>
 
