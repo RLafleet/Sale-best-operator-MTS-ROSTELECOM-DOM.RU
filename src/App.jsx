@@ -15,7 +15,7 @@ import {
 
 const CONSULTANT_NAME = "Связь.Подбор";
 const TELEGRAM_URL = "https://t.me/oh_my_vigor";
-const WHATSAPP_URL = "https://wa.me/89177072098";
+const WHATSAPP_URL = "https://wa.me/+79177072098";
 const PHONE = "+7 987 731 05 29";
 const PHONE_LINK = "89877310529";
 const FORM_NAME = "lead";
